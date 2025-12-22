@@ -1,0 +1,9 @@
+This project adheres to ethical principles in AI and cybersecurity research:
+
+Data Privacy: Datasets (e.g., CIC-IDS2018) are anonymized and publicly available; no personal data collection. Simulations use synthetic traffic to avoid real-user exposure. Compliance with GDPR and institutional IRB guidelines.
+
+Potential Misuse: The RL firewall could be reverse-engineered for attack simulation; mitigate by open-sourcing only defensive components and including usage disclaimers in code repos. No dual-use offensive tools developed.
+
+Responsible AI Deployment: Incorporate bias audits in RL rewards to prevent discriminatory blocking (e.g., over-flagging certain protocols). Promote transparency via explainable AI (e.g., SHAP for decisions) and advocate for human oversight in production. Ethical review: Align with IEEE Ethically Aligned Design and xAI principles for safe AI.
+
+These ensure the work advances security without unintended harm.
