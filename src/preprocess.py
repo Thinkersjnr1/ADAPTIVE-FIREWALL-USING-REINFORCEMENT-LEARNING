@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import os
+import json
+import joblib
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
@@ -31,10 +33,15 @@ def clean_data(df):
 
 def encode_labels(df):
     print("Encoding labels...")
-    le = LabelEncoder()
+    # FIX: force BENIGN to index 0 explicitly rather than relying on
+    # alphabetical sort (which broke on UNSW-NB15's "Analysis" class).
+    unique_classes = sorted(df["Label"].unique(), key=lambda c: (c != "BENIGN", c))
+    class_to_idx = {c: i for i, c in enumerate(unique_classes)}
     df = df.copy()
-    df["Label"] = le.fit_transform(df["Label"])
-    print(f"Classes found: {list(le.classes_)}")
+    df["Label"] = df["Label"].map(class_to_idx)
+    le = LabelEncoder()
+    le.classes_ = np.array(unique_classes)
+    print(f"Classes found: {unique_classes}")
     return df, le
 
 def balance_sample(df):
@@ -49,18 +56,26 @@ def balance_sample(df):
 
 def split_and_scale(df):
     print("Splitting and scaling...")
-    X = df.drop(columns=["Label"]).values
+    feature_cols = [c for c in df.columns if c != "Label"]
+    X = df[feature_cols].values
     y = df["Label"].values
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
+    # Captured for cross-dataset zero-shot use: some external datasets
+    # (e.g. the cleaned CIC-DDoS2019 release) don't include Destination
+    # Port at all, so we impute it with this dataset's own training-set
+    # mean rather than an arbitrary constant like zero.
+    dest_port_idx = feature_cols.index("Destination Port")
+    dest_port_train_mean = float(X_train[:, dest_port_idx].mean())
+
     scaler = MinMaxScaler()
     X_train = scaler.fit_transform(X_train)
     X_test  = scaler.transform(X_test)
 
-    return X_train, X_test, y_train, y_test, scaler
+    return X_train, X_test, y_train, y_test, scaler, feature_cols, dest_port_train_mean
 
 def apply_smote(X_train, y_train):
     print("Applying SMOTE...")
@@ -69,13 +84,37 @@ def apply_smote(X_train, y_train):
     print(f"Training set size after SMOTE: {len(X_res):,}")
     return X_res, y_res
 
-def preprocess():
+def preprocess(use_smote=True, save_artifacts=True, holdout_class=None):
+    if holdout_class is not None:
+        raise NotImplementedError(
+            "Leave-one-class-out (--holdout-class) is currently only "
+            "implemented for --dataset cicids2018."
+        )
     df = load_data()
     df = clean_data(df)
     df, label_encoder = encode_labels(df)
     df = balance_sample(df)
-    X_train, X_test, y_train, y_test, scaler = split_and_scale(df)
-    X_train, y_train = apply_smote(X_train, y_train)
+    X_train, X_test, y_train, y_test, scaler, feature_cols, dest_port_mean = split_and_scale(df)
+
+    if save_artifacts:
+        # Persist everything needed to correctly evaluate a DIFFERENT
+        # dataset against this trained model later: the exact fitted
+        # scaler (must be reused, never refit, for a valid comparison),
+        # the exact feature column order the model expects, and a
+        # fallback value for any feature a new dataset might be missing.
+        os.makedirs("models", exist_ok=True)
+        joblib.dump(scaler, "models/cicids2017_scaler.pkl")
+        joblib.dump(label_encoder, "models/cicids2017_label_encoder.pkl")
+        with open("models/cicids2017_feature_order.json", "w") as f:
+            json.dump(feature_cols, f)
+        with open("models/cicids2017_feature_stats.json", "w") as f:
+            json.dump({"Destination Port_train_mean": dest_port_mean}, f)
+        print("Saved scaler, label encoder, feature order, and feature stats to models/")
+
+    if use_smote:
+        X_train, y_train = apply_smote(X_train, y_train)
+    else:
+        print("Skipping SMOTE (ablation: training on naturally imbalanced classes)")
 
     print("\nPreprocessing complete!")
     print(f"  Training samples : {len(X_train):,}")

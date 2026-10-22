@@ -287,7 +287,7 @@ If you use this work, please cite:
 ```bibtex
 @inproceedings{yewenu2026adaptiveshield,
   title     = {AdaptiveShield: An End-to-End Adaptive Firewall Using Deep Q-Network Reinforcement Learning},
-  author    = {Yewenu, Daniel and Okoya, Timileyin and Sofowora, Mayowa and Ogunsanwo, Olajide},
+  author    = {Daniel Yewenu,  Okoya Timileyin,  Sofowora Mayowa,  Ogunsanwo Olajide},
   booktitle = {Proceedings of IEEE NIGERCON 2026},
   year      = {2026},
   institution = {Lead City University, Ibadan, Nigeria}
