@@ -1,0 +1,7 @@
+# Add these lines to .gitignore
+data/*.db
+data/*.db-wal
+data/*.db-shm
+models/*.joblib
+.env
+__pycache__/
